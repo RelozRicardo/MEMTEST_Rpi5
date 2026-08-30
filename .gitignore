@@ -1,0 +1,9 @@
+# Excluir carpetas de registros locales
+DATOS/
+SUBIDA/
+
+# Excluir temporales de Python y logs
+__pycache__/
+*.pyc
+*.log
+.DS_Store
