@@ -1,0 +1,72 @@
+===================================================================
+ GUÍA DE COMANDOS SYSTEMD - SERVICIOS DE MONITOREO Y LOGGING
+ Servicios: spi_memoria | i2c_memoria | subidor_datos | uart_monitoreo
+===================================================================
+
+-------------------------------------------------------------------
+1. REGISTRO E INICIALIZACIÓN INICIAL (Ejecutar tras crear o modificar .service)
+-------------------------------------------------------------------
+# Recargar la configuración de systemd
+sudo systemctl daemon-reload
+
+# Habilitar el inicio automático al encender la Raspberry Pi
+sudo systemctl enable spi_memoria.service
+sudo systemctl enable i2c_memoria.service
+sudo systemctl enable subidor_datos.service
+sudo systemctl enable uart_monitoreo.service
+
+# Iniciar los servicios de forma inmediata
+sudo systemctl start spi_memoria.service
+sudo systemctl start i2c_memoria.service
+sudo systemctl start subidor_datos.service
+sudo systemctl start uart_monitoreo.service
+
+
+-------------------------------------------------------------------
+2. INICIAR Y DETENER SERVICIOS
+-------------------------------------------------------------------
+# Iniciar todos los servicios juntos
+sudo systemctl start spi_memoria i2c_memoria subidor_datos uart_monitoreo
+
+# Detener todos los servicios juntos
+sudo systemctl stop spi_memoria i2c_memoria subidor_datos uart_monitoreo
+
+# Reiniciar todos los servicios (útil tras actualizar scripts de Python)
+sudo systemctl restart spi_memoria i2c_memoria subidor_datos uart_monitoreo
+
+# Iniciar / Detener un servicio individual (Ejemplo: SPI)
+sudo systemctl start spi_memoria.service
+sudo systemctl stop spi_memoria.service
+sudo systemctl restart spi_memoria.service
+
+
+-------------------------------------------------------------------
+3. DESHABILITAR INICIO AUTOMÁTICO AL ARRANQUE
+-------------------------------------------------------------------
+# Deshabilitar que arranquen solos con el sistema
+sudo systemctl disable spi_memoria.service
+sudo systemctl disable i2c_memoria.service
+sudo systemctl disable subidor_datos.service
+sudo systemctl disable uart_monitoreo.service
+
+
+-------------------------------------------------------------------
+4. CONSULTA DE ESTADO Y MONITOR DE LOGS
+-------------------------------------------------------------------
+# Ver el estado actual de todos los servicios (Pulsar 'q' para salir)
+sudo systemctl status spi_memoria i2c_memoria subidor_datos uart_monitoreo
+
+# Ver estado individual
+sudo systemctl status spi_memoria.service
+sudo systemctl status i2c_memoria.service
+sudo systemctl status subidor_datos.service
+sudo systemctl status uart_monitoreo.service
+
+# Ver salida en tiempo real (stdout / print) de un servicio específico
+sudo journalctl -u spi_memoria.service -f -o cat
+sudo journalctl -u i2c_memoria.service -f -o cat
+sudo journalctl -u subidor_datos.service -f -o cat
+sudo journalctl -u uart_monitoreo.service -f -o cat
+
+# Ver las últimas 50 líneas guardadas del log de un servicio
+sudo journalctl -u spi_memoria.service -n 50 --no-pager

@@ -2,105 +2,140 @@ import os
 import time
 from datetime import datetime
 import spidev
-import RPi.GPIO as GPIO
-
-# ==========================================
-# CONFIGURACIÓN DE PINES SPI Y CS MANUAL
-# ==========================================
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
-
-# Mapeo de canales SPI
-# Canal 0: CE0 (Hardware - GPIO 8)
-# Canal 1: CE1 (Hardware - GPIO 7)
-# Canal 2: CS2 (Manual - GPIO 5)
-PIN_CS2 = 5
-GPIO.setup(PIN_CS2, GPIO.OUT, initial=GPIO.HIGH)
 
 # Instancia SPI principal (Bus 0)
 spi = spidev.SpiDev()
 
+
 def init_spi(device_id=0, max_speed_hz=1000000):
-    """Inicializa la comunicación SPI en el Bus 0 con el canal indicado (0, 1 o 2)."""
+    """Inicializa el Bus 0 para el canal de hardware correspondiente (0 = CE0, 1 = CE1)."""
     global spi
     try:
         spi.close()
     except Exception:
         pass
 
-    if device_id in [0, 1]:
-        spi.open(0, device_id)
-    elif device_id == 2:
-        # Para el CS manual (GPIO 5), abrimos el bus en modo 'no CS' o usando canal 0
-        spi.open(0, 0)
-        spi.no_cs = True  # Desactiva el control automatico de hardware para controlar GPIO 5 manualmente
-        
+    spi.open(0, device_id)
     spi.max_speed_hz = max_speed_hz
-    spi.mode = 0b00  # SPI Mode 0 (CPOL=0, CPHA=0)
+    spi.mode = 0b00  # Mode 0 (CPOL=0, CPHA=0)
 
-def seleccionar_cs(device_id, enable=True):
-    """Maneja la línea CS2 manual si corresponde."""
-    if device_id == 2:
-        # CS activo en LOW
-        GPIO.output(PIN_CS2, GPIO.LOW if enable else GPIO.HIGH)
 
-# ==========================================
-# LECTURA / ESCRITURA SPI (Comandos Estándar 25xxx)
-# ==========================================
-# Comandos tipicos EEPROM/Flash SPI:
-# 0x06 = Write Enable (WREN)
-# 0x02 = Write (WRITE)
-# 0x03 = Read (READ)
-
-def write_byte_spi(device_id, mem_addr, data):
-    """Escribe un byte en la memoria SPI dada."""
+def esperar_listo(device_id):
+    """Lee el Status Register 1 (0x05) hasta que el bit BUSY (bit 0) sea 0."""
     init_spi(device_id)
-    
-    # 1. Enviar comando WRITE ENABLE (0x06)
-    seleccionar_cs(device_id, True)
-    spi.xfer2([0x06])
-    seleccionar_cs(device_id, False)
-    
-    time.sleep(0.001)
+    while True:
+        resp = spi.xfer2([0x05, 0x00])
+        if not (resp[1] & 0x01):
+            break
+        time.sleep(0.001)
 
-    # 2. Enviar comando WRITE (0x02) + Dirección 16-bit + Dato
-    high = (mem_addr >> 8) & 0xFF
-    low = mem_addr & 0xFF
-    
-    seleccionar_cs(device_id, True)
-    spi.xfer2([0x02, high, low, data])
-    seleccionar_cs(device_id, False)
-    
-    time.sleep(0.005)  # Tiempo de escritura física (tWR)
+
+def obtener_capacidad_spi(device_id):
+    """Lee el JEDEC ID (0x9F) para determinar el tamaño físico de la memoria en bytes."""
+    init_spi(device_id)
+    resp = spi.xfer2([0x9F, 0x00, 0x00, 0x00])
+
+    fabricante = resp[1]
+    tipo_memoria = resp[2]
+    capacidad_code = resp[3]
+
+    # Descarta lecturas flotantes/basura si no hay memoria conectada (0xFF o 0x00)
+    if fabricante in [0xFF, 0x00] or tipo_memoria in [0xFF, 0x00]:
+        return 0
+
+    # Rango de capacidad para memorias SPI NOR Flash (0x10 = 1MB hasta 0x19 = 32MB)
+    if 0x10 <= capacidad_code <= 0x19:
+        return 1 << capacidad_code
+    else:
+        return 0
+
+
+def chip_erase_spi(device_id):
+    """Ejecuta un borrado completo de la memoria (Chip Erase 0xC7)."""
+    esperar_listo(device_id)
+
+    # 1. Write Enable
+    spi.xfer2([0x06])
+
+    # 2. Command Chip Erase
+    spi.xfer2([0xC7])
+
+    # 3. Esperar a que finalice el borrado
+    esperar_listo(device_id)
+
+def esperar_listo(device_id):
+    """Lee el Status Register 1 (0x05) en bucle hasta que el bit BUSY (bit 0) sea 0."""
+    init_spi(device_id)
+    while True:
+        # Comando 0x05 + 1 dummy byte para recibir la respuesta
+        resp = spi.xfer2([0x05, 0x00])
+        status = resp[1]
+        
+        # El bit 0 es BUSY (1 = Ocupado programando/borrando, 0 = Listo)
+        if not (status & 0x01):
+            break
+        
+        time.sleep(0.001)  # Pausa de 1ms para no saturar la CPU de la Pi
+
+def write_page_spi(device_id, mem_addr, data_bytes):
+    """Escribe un bloque de datos (hasta 128 bytes) asegurando alineación de página."""
+    # Asegura que el bloque nunca supere los 128 bytes
+    data_bytes = data_bytes[:128]
+
+    esperar_listo(device_id)
+
+    # 1. Write Enable (0x06)
+    spi.xfer2([0x06])
+
+    # 2. Page Program (0x02) + Dirección de 24 bits + Datos (128 bytes)
+    addr_h = (mem_addr >> 16) & 0xFF
+    addr_m = (mem_addr >> 8) & 0xFF
+    addr_l = mem_addr & 0xFF
+
+    spi.xfer2([0x02, addr_h, addr_m, addr_l] + list(data_bytes))
+
+    # 3. Esperar que la memoria grabe las celdas en el silicio
+    esperar_listo(device_id)
 
 def read_byte_spi(device_id, mem_addr):
-    """Lee un byte de la memoria SPI dada."""
+    """Lee un byte en direccionamiento de 24-bit."""
     init_spi(device_id)
-    
-    high = (mem_addr >> 8) & 0xFF
-    low = mem_addr & 0xFF
-    
-    seleccionar_cs(device_id, True)
-    # Mandamos 0x03 (READ), Dirección High, Dirección Low, y un dummy byte (0x00) para recibir la respuesta
-    respuesta = spi.xfer2([0x03, high, low, 0x00])
-    seleccionar_cs(device_id, False)
-    
-    return respuesta[3]
+
+    addr_h = (mem_addr >> 16) & 0xFF
+    addr_m = (mem_addr >> 8) & 0xFF
+    addr_l = mem_addr & 0xFF
+
+    respuesta = spi.xfer2([0x03, addr_h, addr_m, addr_l, 0x00])
+    return respuesta[4]
+
+def read_block_spi(device_id, mem_addr, length=128):
+    """Lee un bloque continuo de bytes (por defecto 128 bytes)."""
+    init_spi(device_id)
+
+    addr_h = (mem_addr >> 16) & 0xFF
+    addr_m = (mem_addr >> 8) & 0xFF
+    addr_l = mem_addr & 0xFF
+
+    # Comando READ (0x03) + Dirección (3 bytes) + 128 bytes dummy
+    cmd = [0x03, addr_h, addr_m, addr_l] + [0x00] * length
+    respuesta = spi.xfer2(cmd)
+
+    # Retorna únicamente los 128 bytes leídos
+    return respuesta[4:]
 
 def buscar_memorias_spi():
-    """Prueba comunicación en los 3 canales SPI (CE0, CE1, CS2) intentando leer la dirección 0."""
+    """Busca memorias únicamente en los canales hardware CS0 (CE0) y CS1 (CE1)."""
     encontradas = []
-    for dev_id in [0, 1, 2]:
+    for dev_id in [0, 1]:
         try:
-            read_byte_spi(dev_id, 0)
-            encontradas.append(dev_id)
+            tamano = obtener_capacidad_spi(dev_id)
+            if tamano > 0:
+                encontradas.append(dev_id)
         except Exception:
             pass
     return encontradas
 
-# ==========================================
-# LECTURA DE TEMPERATURA
-# ==========================================
+
 def get_cpu_temp():
     try:
         with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
@@ -108,9 +143,7 @@ def get_cpu_temp():
     except Exception:
         return 0.0
 
-# ==========================================
-# BUFFER LOGGER PARA SPI
-# ==========================================
+
 class BufferLoggerSPI:
     def __init__(self, device_id, intervalo_minutos=2):
         self.device_id = device_id
@@ -135,7 +168,7 @@ class BufferLoggerSPI:
                         base_folder,
                         "SPI",
                         f"CANAL_CS{self.device_id}",
-                        fecha
+                        fecha,
                     )
                     os.makedirs(folder_path, exist_ok=True)
                     file_path = os.path.join(folder_path, filename)
