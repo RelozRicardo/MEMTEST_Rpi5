@@ -7,8 +7,9 @@ import spidev
 spi = spidev.SpiDev()
 
 
-def init_spi(device_id=0, max_speed_hz=1000000):
+def init_spi(device_id=0, max_speed_hz=100000):
     """Inicializa el Bus 0 para el canal de hardware correspondiente (0 = CE0, 1 = CE1)."""
+    ## ORIGINALMENTE ERAN 2MHZ, se bajo a 100 KHZ por falsos SEU detectados en memorias de 32MB (W25Q256JV) a 2MHz.
     global spi
     try:
         spi.close()
@@ -19,7 +20,15 @@ def init_spi(device_id=0, max_speed_hz=1000000):
     spi.max_speed_hz = max_speed_hz
     spi.mode = 0b00  # Mode 0 (CPOL=0, CPHA=0)
 
-
+def reset_memoria_spi(device_id=0):
+  """Envía los comandos de Enable Reset (0x66) y Reset (0x99) a la memoria NOR Flash."""
+  init_spi(device_id)
+  # 0x66: Enable Reset, 0x99: Reset Device
+  spi.xfer2([0x66])
+  time.sleep(0.001)
+  spi.xfer2([0x99])
+  time.sleep(0.010)  # Esperar 10ms a que el chip complete el reinicio interno
+  
 def esperar_listo(device_id):
     """Lee el Status Register 1 (0x05) hasta que el bit BUSY (bit 0) sea 0."""
     init_spi(device_id)

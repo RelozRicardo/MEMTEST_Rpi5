@@ -25,7 +25,21 @@ PAUSA_ENTRE_VUELTAS = 1  # Pausa breve para permitir intercalar escaneo dinámic
 
 memorias_activas = {}
 
+# =========================================================
+# INICIALIZACIÓN Y SEGURIDAD AL ARRANQUE
+# =========================================================
 print("=== INICIANDO SERVICIO MONITOREO MEMORIAS SPI CONTINUO ===")
+
+# Pausa de seguridad para estabilización de fuente en frío
+print("[BOOT] Esperando estabilización de alimentación del sistema (3s)...")
+time.sleep(3)
+
+# Forzar Reset por Software de la memoria
+try:
+  reset_memoria_spi(0)
+  print("[BOOT] Comando de Reset enviado exitosamente a la memoria CS0.")
+except Exception as e:
+  print(f"[BOOT] Advertencia al enviar Reset SPI: {e}")
 
 try:
     while True:
