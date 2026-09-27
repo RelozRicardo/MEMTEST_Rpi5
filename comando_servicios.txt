@@ -3,6 +3,9 @@
  Servicios: spi_memoria | i2c_memoria | subidor_datos | uart_monitoreo
 ===================================================================
 
+LINK GITHUB
+https://github.com/RelozRicardo/MEMTEST_Rpi5.git
+
 -------------------------------------------------------------------
 1. REGISTRO E INICIALIZACIÓN INICIAL (Ejecutar tras crear o modificar .service)
 -------------------------------------------------------------------
