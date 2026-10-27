@@ -20,7 +20,7 @@ class X9C103S:
 
     def _pulso_inc(self):
         GPIO.output(self.pin_inc, GPIO.LOW)
-        time.sleep(0.002)  # 2 ms asegura complimiento holgado del datasheet
+        time.sleep(0.002)  # 2 ms asegura cumplimiento holgado del datasheet
         GPIO.output(self.pin_inc, GPIO.HIGH)
         time.sleep(0.002)
 
@@ -65,7 +65,7 @@ class X9C103S:
             # CS sube con INC en HIGH -> Guarda posición en memoria no volátil
             GPIO.output(self.pin_inc, GPIO.HIGH)
             GPIO.output(self.pin_cs, GPIO.HIGH)
-            time.sleep(0.020)  # Espera t_WC (20 ms para ciclo completo de escritura EEPROM)
+            time.sleep(0.020)  # Espera t_WC (20 ms para escritura EEPROM)
         else:
             # CS sube con INC en LOW -> NO guarda en EEPROM (ahorra desgaste)
             GPIO.output(self.pin_inc, GPIO.LOW)

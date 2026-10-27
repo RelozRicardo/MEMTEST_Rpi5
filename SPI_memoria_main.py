@@ -14,6 +14,7 @@ from spi_lib import (
     chip_erase_spi,
     write_page_spi,
     read_block_spi,
+    reset_memoria_spi,
     get_cpu_temp,
     BufferLoggerSPI
 )
@@ -36,10 +37,10 @@ time.sleep(3)
 
 # Forzar Reset por Software de la memoria
 try:
-  reset_memoria_spi(0)
-  print("[BOOT] Comando de Reset enviado exitosamente a la memoria CS0.")
+    reset_memoria_spi(0)
+    print("[BOOT] Comando de Reset enviado exitosamente a la memoria CS0.")
 except Exception as e:
-  print(f"[BOOT] Advertencia al enviar Reset SPI: {e}")
+    print(f"[BOOT] Advertencia al enviar Reset SPI: {e}")
 
 try:
     while True:

@@ -18,7 +18,13 @@ SUBIDA_DIR = os.path.join(BASE_DIR, "SUBIDA")
 POT_CONFIG_FILE = os.path.join(BASE_DIR, "nivel_pot.txt")
 nombre_carpeta = "RB0_V2"
 # Variable global para comunicar el estado del DigiPot entre hilos
-NIVEL_POT_ACTUAL = 1
+NIVEL_POT_ACTUAL = 16
+
+# =========================================================
+# LÍMITES DE SEGURIDAD DEL DIGIPOT (Para evitar Dropout 1.99V en LM317)
+# =========================================================
+DIGIPOT_MIN_STEP = 2  # Límite inferior seguro
+DIGIPOT_MAX_STEP = 85  # Límite superior seguro (evita saturar el LM317)
 
 # ==========================================
 # HILO 1: MONITOREO Y REGISTRO DE INA219
@@ -103,14 +109,17 @@ def hilo_subidor_archivos():
 # ==========================================
 def hilo_control_digipot():
     global NIVEL_POT_ACTUAL
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] [DIGIPOT] Inicializando X9C103S...")
-    
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S')}] [DIGIPOT] Inicializando"
+        " X9C103S..."
+    )
+
     pot = X9C103S()
     pot.resetear_a_cero()
-    
+
     if not os.path.exists(POT_CONFIG_FILE):
         with open(POT_CONFIG_FILE, "w") as f:
-            f.write("0\n")
+            f.write(f"{DIGIPOT_MIN_STEP}\n")
 
     ultimo_nivel = -1
 
@@ -119,26 +128,60 @@ def hilo_control_digipot():
             if os.path.exists(POT_CONFIG_FILE):
                 with open(POT_CONFIG_FILE, "r") as f:
                     contenido = f.read().strip()
-                
-                if contenido.isdigit():
-                    # Mapeo a rango válido 0 - 99
-                    nivel_solicitado = int(contenido)
-                    nivel_solicitado = max(0, min(99, nivel_solicitado))
 
-                    if nivel_solicitado != ultimo_nivel:
-                        hora_str = datetime.now().strftime('%H:%M:%S')
-                        print(f"[{hora_str}] [DIGIPOT] Cambiando nivel de tensión a: {nivel_solicitado} / 99")
-                        
-                        # Cambia sin escribir en la EEPROM interna del chip
-                        pot.set_nivel(nivel_solicitado, guardar_eeprom=False)
-                        
-                        ultimo_nivel = nivel_solicitado
-                        NIVEL_POT_ACTUAL = nivel_solicitado
-            
+                if contenido.isdigit():
+                    nivel_solicitado = int(contenido)
+
+                    # 1. Clamping de seguridad entre MIN_STEP y MAX_STEP
+                    nivel_seguro = max(
+                        DIGIPOT_MIN_STEP,
+                        min(DIGIPOT_MAX_STEP, nivel_solicitado),
+                    )
+
+                    if nivel_seguro != ultimo_nivel:
+                        hora_str = datetime.now().strftime("%H:%M:%S")
+
+                        # 2. Si el salto es mayor a 20 pasos, forzar reseteo a cero para eliminar deriva
+                        diferencia_pasos = abs(
+                            nivel_seguro - pot.posicion_actual
+                        )
+                        if diferencia_pasos > 20:
+                            print(
+                                f"[{hora_str}] [DIGIPOT] Salto grande"
+                                f" ({diferencia_pasos} pasos). Re-calibrando a"
+                                " cero..."
+                            )
+                            pot.resetear_a_cero()
+                            time.sleep(0.010)
+
+                        if nivel_seguro != nivel_solicitado:
+                            print(
+                                f"[{hora_str}] [DIGIPOT] Nivel"
+                                f" {nivel_solicitado} ajustado por seguridad"
+                                f" a: {nivel_seguro} / 99"
+                            )
+                        else:
+                            print(
+                                f"[{hora_str}] [DIGIPOT] Cambiando nivel de"
+                                f" tensión a: {nivel_seguro} / 99"
+                            )
+
+                        # 3. Aplicar nivel objetivo sin escribir en EEPROM
+                        pot.set_nivel(nivel_seguro, guardar_eeprom=False)
+
+                        # 4. Tiempo de asentamiento (100 ms) para estabilización del LM317 y desacople
+                        time.sleep(0.100)
+
+                        ultimo_nivel = nivel_seguro
+                        NIVEL_POT_ACTUAL = nivel_seguro
+
             time.sleep(1)
         except Exception as e:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] [DIGIPOT ERROR] {e}")
+            print(
+                f"[{datetime.now().strftime('%H:%M:%S')}] [DIGIPOT ERROR] {e}"
+            )
             time.sleep(3)
+
 
 # ==========================================
 # ARRANQUE PRINCIPAL
