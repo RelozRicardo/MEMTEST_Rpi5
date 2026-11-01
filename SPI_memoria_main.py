@@ -68,14 +68,28 @@ try:
             print(f"  -> CS{dev_id}: Borrando memoria (Chip Erase)...")
             chip_erase_spi(dev_id)
 
+            # ---------------------------------------------------------
+            # Cargar patrón 0xAA con reporte por porcentaje (cada 10%)
+            # ---------------------------------------------------------
             print(f"  -> CS{dev_id}: Cargando patrón 0xAA...")
             patron_bloque = [PATRON] * CHUNK_PAGE
+            paso_porcentaje = 10  # Imprimir cada 10%
+            siguiente_umbral = paso_porcentaje
+
             for mem_addr in range(0, tamano_memoria, CHUNK_PAGE):
                 write_page_spi(dev_id, mem_addr, patron_bloque)
 
-                if mem_addr > 0 and (mem_addr % (1024 * 1024) == 0):
-                    progreso_mb = mem_addr / (1024 * 1024)
-                    print(f"  -> CS{dev_id}: Escritos {progreso_mb:.1f} / {mb_size:.1f} MB")
+                # Calcular porcentaje actual
+                porcentaje = (mem_addr + CHUNK_PAGE) * 100 / tamano_memoria
+
+                if porcentaje >= siguiente_umbral or mem_addr + CHUNK_PAGE >= tamano_memoria:
+                    hora_act = datetime.now().strftime("%H:%M:%S")
+                    progreso_mb = (mem_addr + CHUNK_PAGE) / (1024 * 1024)
+                    print(
+                        f"[{hora_act}]   -> CS{dev_id}: Escritos"
+                        f" {progreso_mb:.2f}/{mb_size:.2f} MB ({porcentaje:.0f}%)"
+                    )
+                    siguiente_umbral += paso_porcentaje
 
             print(f"  -> CS{dev_id}: Inicialización completa. Sumado a monitoreo.")
             logger.agregar_evento("Inicialización completada.")
@@ -101,10 +115,17 @@ try:
             del memorias_activas[dev_id]
 
         # 4. Monitoreo pasante: Realiza 1 vuelta completa en TODAS las memorias activas
+         # ---------------------------------------------------------
+        # Monitoreo pasante con reportes parciales de avance
+        # ---------------------------------------------------------
         for dev_id, info in list(memorias_activas.items()):
             info["vueltas"] += 1
             logger = info["logger"]
             tamano_memoria = info["tamano"]
+
+            # Reportar progreso cada 512 KB (524288 bytes)
+            TRAMO_BYTES = 512 * 1024
+            siguiente_reporte = TRAMO_BYTES
 
             for mem_addr in range(0, tamano_memoria, CHUNK_READ):
                 bloque = read_block_spi(dev_id, mem_addr, CHUNK_READ)
@@ -118,20 +139,42 @@ try:
                             info["errores_reportados"].add(dir_exacta)
 
                             hora_pantalla = datetime.now().strftime("%H:%M:%S")
-                            msg_seu = f"SEU DETECTADO! Dir: 0x{dir_exacta:06X} | Leido: 0x{dato:02X} | Esperado: 0x{PATRON:02X} | Vuelta #{info['vueltas']}"
+                            msg_seu = (
+                                f"SEU DETECTADO! Dir: 0x{dir_exacta:06X} | Leido: 0x{dato:02X} |"
+                                f" Esperado: 0x{PATRON:02X} | Vuelta #{info['vueltas']}"
+                            )
                             print(f"\n[{hora_pantalla}] [ALERT CS{dev_id}] {msg_seu}")
                             logger.agregar_evento(msg_seu)
 
-            temp_cpu = get_cpu_temp()
-            hora_pantalla = datetime.now().strftime("%H:%M:%S")
-            msg_resumen = f"Vuelta #{info['vueltas']} completa ({tamano_memoria / (1024*1024):.1f} MB) | SEUs: {info['errores_totales']} | CPU: {temp_cpu:.1f}°C"
-            
-            # Imprime el resumen con un salto de línea limpio para que QUEDE en el historial
-            print(f"\r\033[K[{hora_pantalla}] [INFO CS{dev_id}] {msg_resumen}\n")
-            logger.agregar_evento(msg_resumen)
+                # Imprimir avance parcial cada 512 KB o al finalizar la memoria
+                if (
+                    mem_addr + CHUNK_READ >= siguiente_reporte
+                    or mem_addr + CHUNK_READ >= tamano_memoria
+                ):
+                    porcentaje_lectura = (
+                        (mem_addr + CHUNK_READ) * 100 / tamano_memoria
+                    )
+                    temp_cpu = get_cpu_temp()
+                    hora_pantalla = datetime.now().strftime("%H:%M:%S")
 
-            logger.verificar_y_guardar()
+                    msg_progreso = (
+                        f"CS{dev_id} | Vuelta #{info['vueltas']} | Progreso:"
+                        f" {porcentaje_lectura:.0f}% | SEUs Acumulados:"
+                        f" {info['errores_totales']} | CPU: {temp_cpu:.1f}°C"
+                    )
 
+                    # Actualizar línea en vivo en la terminal
+                    print(f"\r\033[K[{hora_pantalla}] [READ CS{dev_id}] {msg_progreso}", end="", flush=True)
+
+                    siguiente_reporte += TRAMO_BYTES
+
+                # Al terminar la vuelta completa se hace un salto de línea limpio
+                print()
+                logger.agregar_evento(
+                    f"Vuelta #{info['vueltas']} completada. Total SEUs:"
+                    f" {info['errores_totales']}"
+                )
+                logger.verificar_y_guardar()
         time.sleep(PAUSA_ENTRE_VUELTAS)
 
 except KeyboardInterrupt:

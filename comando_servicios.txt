@@ -3,6 +3,11 @@
  Servicios: spi_memoria | i2c_memoria | subidor_datos | uart_monitoreo
 ===================================================================
 
+Ver I2C CONEXIONES
+sudo i2cdetect -y 1
+
+UART, Maneja las UART 0 Y 4 DEL PROPIO SISTEMA, USANDO BAUDRATE 115200
+
 LINK GITHUB
 https://github.com/RelozRicardo/MEMTEST_Rpi5.git
 
