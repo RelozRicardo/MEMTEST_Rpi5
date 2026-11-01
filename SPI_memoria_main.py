@@ -65,13 +65,13 @@ try:
             logger = BufferLoggerSPI(device_id=dev_id, intervalo_minutos=2)
             logger.agregar_evento(f"MEMORIA SPI CONECTADA CANAL CS{dev_id} | CAPACIDAD: {tamano_memoria} BYTES")
 
-            print(f"  -> CS{dev_id}: Borrando memoria (Chip Erase)...")
+            print(f"   -> CS{dev_id}: Borrando memoria (Chip Erase)...")
             chip_erase_spi(dev_id)
 
             # ---------------------------------------------------------
             # Cargar patrón 0xAA con reporte por porcentaje (cada 10%)
             # ---------------------------------------------------------
-            print(f"  -> CS{dev_id}: Cargando patrón 0xAA...")
+            print(f"   -> CS{dev_id}: Cargando patrón 0xAA...")
             patron_bloque = [PATRON] * CHUNK_PAGE
             paso_porcentaje = 10  # Imprimir cada 10%
             siguiente_umbral = paso_porcentaje
@@ -86,12 +86,12 @@ try:
                     hora_act = datetime.now().strftime("%H:%M:%S")
                     progreso_mb = (mem_addr + CHUNK_PAGE) / (1024 * 1024)
                     print(
-                        f"[{hora_act}]   -> CS{dev_id}: Escritos"
+                        f"[{hora_act}]    -> CS{dev_id}: Escritos"
                         f" {progreso_mb:.2f}/{mb_size:.2f} MB ({porcentaje:.0f}%)"
                     )
                     siguiente_umbral += paso_porcentaje
 
-            print(f"  -> CS{dev_id}: Inicialización completa. Sumado a monitoreo.")
+            print(f"   -> CS{dev_id}: Inicialización completa. Sumado a monitoreo.")
             logger.agregar_evento("Inicialización completada.")
 
             memorias_activas[dev_id] = {
@@ -115,9 +115,6 @@ try:
             del memorias_activas[dev_id]
 
         # 4. Monitoreo pasante: Realiza 1 vuelta completa en TODAS las memorias activas
-         # ---------------------------------------------------------
-        # Monitoreo pasante con reportes parciales de avance
-        # ---------------------------------------------------------
         for dev_id, info in list(memorias_activas.items()):
             info["vueltas"] += 1
             logger = info["logger"]
@@ -168,13 +165,14 @@ try:
 
                     siguiente_reporte += TRAMO_BYTES
 
-                # Al terminar la vuelta completa se hace un salto de línea limpio
-                print()
-                logger.agregar_evento(
-                    f"Vuelta #{info['vueltas']} completada. Total SEUs:"
-                    f" {info['errores_totales']}"
-                )
-                logger.verificar_y_guardar()
+            # --- INDENTACIÓN CORREGIDA (Fuera del for mem_addr) ---
+            print()
+            logger.agregar_evento(
+                f"Vuelta #{info['vueltas']} completada. Total SEUs:"
+                f" {info['errores_totales']}"
+            )
+            logger.verificar_y_guardar()
+
         time.sleep(PAUSA_ENTRE_VUELTAS)
 
 except KeyboardInterrupt:
