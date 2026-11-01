@@ -1,0 +1,43 @@
+===============================================================================
+
+                       INSTRUCCIONES DE USO Y ARCHIVOS
+
+===============================================================================
+
+- Contraseña de acceso temporal: 1234lifede
+- LINK GITHUB: https://github.com/RelozRicardo/MEMTEST_Rpi5.git
+
+-------------------------------------------------------------------------------
+REGLA DE GESTIÓN DE ARCHIVOS Y SUBIDA AL SERVIDOR
+-------------------------------------------------------------------------------
+
+Aunque la cátedra haya entregado un código para subir archivos al servidor, no recomiendo usar el programa o script propio para subir datos directamente. 
+Esto evita que haya múltiples programas enviando información al mismo tiempo y saturando la conexión, ya hubo casos del cuatrimestre anterior que solo un programa subia a la vez.
+
+
+Cualquier programa o prueba que se cree si se genera los archivos de logs guardándolos simultáneamente en estas dos carpetas locales:
+  1. DATOS/   (Guarda la copia de respaldo local)
+  2. SUBIDA/  (Carpeta de paso donde el sistema toma los datos)
+
+El servicio en segundo plano de la Raspberry Pi se encarga automáticamente de tomar lo que esté en "SUBIDA/", enviarlo al servidor y limpiar la carpeta.
+
+-------------------------------------------------------------------------------
+EJEMPLO RÁPIDO EN PYTHON
+-------------------------------------------------------------------------------
+
+import os
+from datetime import datetime
+def guardar_log(modulo, contenido):
+    ahora = datetime.now()
+    fecha = ahora.strftime("%Y-%m-%d")
+    archivo = f"log_{ahora.strftime('%H_%M_%S')}.txt"
+
+    # Guarda únicamente en las 2 carpetas requeridas
+    for carpeta_base in ["DATOS", "SUBIDA"]:
+        ruta = os.path.join(carpeta_base, modulo, fecha)
+        os.makedirs(ruta, exist_ok=True)
+        with open(os.path.join(ruta, archivo), "w") as f:
+            f.write(contenido)
+
+# Ejemplo:
+guardar_log("MI_PRUEBA", "Dato de ejemplo\n")
