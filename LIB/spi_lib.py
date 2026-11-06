@@ -8,7 +8,7 @@ spi = spidev.SpiDev()
 
 ## ACTIVAR PULL UPS DE LOS PINES SPI (MOSI, MISO, SCLK) PARA EVITAR FLOTANTES
 
-def init_spi(device_id=0, max_speed_hz=100000):
+def init_spi(device_id=0, max_speed_hz=300000):
     global spi
 
     # 1. Configurar polarización interna de los pines

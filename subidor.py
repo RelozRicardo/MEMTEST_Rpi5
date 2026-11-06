@@ -24,7 +24,7 @@ NIVEL_POT_ACTUAL = 16
 # LÍMITES DE SEGURIDAD DEL DIGIPOT (Para evitar Dropout 1.99V en LM317)
 # =========================================================
 DIGIPOT_MIN_STEP = 2  # Límite inferior seguro
-DIGIPOT_MAX_STEP = 85  # Límite superior seguro (evita saturar el LM317)
+DIGIPOT_MAX_STEP = 98  # Límite superior seguro (evita saturar el LM317)
 
 # ==========================================
 # HILO 1: MONITOREO Y REGISTRO DE INA219
