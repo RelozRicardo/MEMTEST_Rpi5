@@ -44,22 +44,22 @@ class INA219Monitor:
         except Exception:
             return 0.0, 0.0, 0.0
 
-    def registrar_lectura(self, nivel_pot=1, temp_cpu=0.0):
+    def registrar_lectura(self, nivel_pot=1, temp_cpu=0.0, vcc_ads=0.0):
         v, i, p = self.leer_consumo()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         hora_pantalla = datetime.now().strftime("%H:%M:%S")
         
         # Formato ampliado con DigiPot y CPU Temp
         linea = (
-            f"[{timestamp}] [INA219] I={i:.2f}mA | "
-            f"POT={nivel_pot}/100 | CPU={temp_cpu:.1f} °C\n"
+            f"[{timestamp}] [INA219] I={i:.3f}mA | Vina={v:.3f}V | P={p:.3f}mW | "
+            f"VCCADC={vcc_ads:.3f}V | POT={nivel_pot}/100 | CPU={temp_cpu:.2f} °C\n"
         )
         self.buffer.append(linea)
         
         # Muestra la lectura actual completa por terminal
         print(
-            f"[{hora_pantalla}] [INA219] I: {i:.2f}mA | "
-            f"POT: {nivel_pot}/100 | CPU: {temp_cpu:.1f} °C"
+            f"[{hora_pantalla}] [INA219] I: {i:.3f}mA | Vina: {v:.3f}V | P: {p:.3f}mW | "
+            f"VCCADC: {vcc_ads:.3f}V | POT: {nivel_pot}/100 | CPU: {temp_cpu:.2f} °C"
         )
 
     def verificar_y_guardar(self, forzar=False):

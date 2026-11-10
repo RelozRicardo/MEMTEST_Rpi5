@@ -16,7 +16,7 @@ chan = AnalogIn(ads, 0)
 print("--- Leyendo ADS1115 en 0x48 (Canal A0) ---")
 try:
     while True:
-        print(f"Valor digital: {chan.value:6d}  |  Tensión: {chan.voltage:6.4f} V")
+        print(f"Valor digital: {chan.value:6d}  |  Tensión: {2*chan.voltage:6.4f} V")
         time.sleep(1)
 except KeyboardInterrupt:
     print("\nLectura finalizada.")

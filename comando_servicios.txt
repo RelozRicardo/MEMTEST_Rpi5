@@ -78,3 +78,6 @@ sudo journalctl -u uart_monitoreo.service -f -o cat
 
 # Ver las últimas 50 líneas guardadas del log de un servicio
 sudo journalctl -u spi_memoria.service -n 50 --no-pager
+
+#Ver el servicio archivo
+sudo nano /etc/systemd/system/subidor_datos.service 
